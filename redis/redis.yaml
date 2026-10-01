@@ -26,7 +26,6 @@ data:
     cluster-enabled yes
     cluster-config-file /data/nodes.conf
     cluster-node-timeout 5000
-    #cluster-preferred-endpoint-type hostname #cluster break after restarting the node
 
     appendonly yes
     protected-mode no

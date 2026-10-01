@@ -25,7 +25,7 @@ metadata:
   name: zookeeper
 spec:
   serviceName: zookeeper
-  podManagementPolicy: Parallel #added because readiness is causing issues with one by one pods creating
+  podManagementPolicy: Parallel 
   replicas: 3
 
   selector:

@@ -1,0 +1,16 @@
+# Shell scripts must use LF
+*.sh text eol=lf
+
+# Kubernetes / YAML files use LF
+*.yaml text eol=lf
+*.yml text eol=lf
+
+# Java source files use LF
+*.java text eol=lf
+
+# Dockerfiles use LF
+Dockerfile text eol=lf
+*.dockerfile text eol=lf
+
+# Markdown files use LF
+*.md text eol=lf
