@@ -58,7 +58,7 @@ spec:
 
       containers:
         - name: ratelimiter
-          image: rate-limiter:42
+          image: aschay/ratelimiter:latest
           imagePullPolicy: IfNotPresent
 
           securityContext:
