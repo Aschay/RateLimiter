@@ -1,5 +1,6 @@
 package com.Ratelimiter.config.zookeeper;
 
+import jakarta.annotation.PreDestroy;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.CuratorFrameworkFactory;
 import org.apache.curator.retry.ExponentialBackoffRetry;
@@ -24,5 +25,10 @@ public class ZookeeperClient {
 
     public CuratorFramework getClient() {
         return client;
+    }
+
+    @PreDestroy
+    public void close() {
+        client.close();
     }
 }

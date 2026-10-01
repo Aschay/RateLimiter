@@ -1,6 +1,7 @@
 package com.Ratelimiter.config.zookeeper;
 
 import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 import org.apache.curator.framework.recipes.cache.CuratorCache;
 import org.springframework.stereotype.Component;
 
@@ -13,6 +14,9 @@ public class RateLimitConfigWatcher {
 
     private volatile int capacity;
     private volatile double refillRate;
+
+    private CuratorCache cache;
+
     public RateLimitConfigWatcher(ZookeeperClient zooKeeperClient) {
         this.zooKeeperClient = zooKeeperClient;
     }
@@ -20,7 +24,7 @@ public class RateLimitConfigWatcher {
     @PostConstruct
     public void watch() {
 
-        CuratorCache cache = CuratorCache.builder(
+        cache = CuratorCache.builder(
                 zooKeeperClient.getClient(),
                 "/rate-limiter/config"
         ).build();
@@ -43,7 +47,7 @@ public class RateLimitConfigWatcher {
             }
 
             if (path.endsWith("/refillRate")) {
-                refillRate = Double.parseDouble(value); // CHANGED
+                refillRate = Double.parseDouble(value);
             }
 
             System.out.println(
@@ -61,5 +65,10 @@ public class RateLimitConfigWatcher {
 
     public double getRefillRate() {
         return refillRate;
+    }
+
+    @PreDestroy
+    public void close() {
+        cache.close();
     }
 }
