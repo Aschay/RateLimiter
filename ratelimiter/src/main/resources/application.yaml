@@ -1,0 +1,46 @@
+spring:
+  application:
+    name: ratelimiter
+
+  data:
+    redis:
+      cluster:
+        nodes:
+          - redis-0.redis:6379
+          - redis-1.redis:6379
+          - redis-2.redis:6379
+          - redis-3.redis:6379
+          - redis-4.redis:6379
+          - redis-5.redis:6379
+
+  cloud:
+    gateway:
+      server:
+        webflux:
+          routes:
+            - id: products
+              uri: http://product-service:7070
+              predicates:
+                - Path=/products,/products/**
+              filters:
+                - RateLimit
+
+  webflux:
+    multipart:
+      max-in-memory-size:
+
+server:
+  port: 8080
+
+zookeeper:
+  connect-string: ${ZOOKEEPER_HOST}:2181
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,gateway
+
+  endpoint:
+    gateway:
+      access: read-only

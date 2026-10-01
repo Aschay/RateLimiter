@@ -1,0 +1,114 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+spec:
+  clusterIP: None
+  selector:
+    app: redis
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: 6379
+    - name: cluster
+      port: 16379
+      targetPort: 16379
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: redis-config
+data:
+  redis.conf: |
+    port 6379
+
+    cluster-enabled yes
+    cluster-config-file /data/nodes.conf
+    cluster-node-timeout 5000
+    #cluster-preferred-endpoint-type hostname #cluster break after restarting the node
+
+    appendonly yes
+    protected-mode no
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redis
+spec:
+  serviceName: redis
+  replicas: 6
+
+  selector:
+    matchLabels:
+      app: redis
+
+  template:
+    metadata:
+      labels:
+        app: redis
+
+    spec:
+      containers:
+        - name: redis
+          image: redis:7.4
+
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 999
+            runAsGroup: 999
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+
+          command:
+            - /bin/sh
+            - -c
+            - |
+              cp /etc/redis/redis.conf /tmp/redis.conf
+
+              echo "cluster-announce-hostname ${HOSTNAME}.redis" >> /tmp/redis.conf
+              echo "cluster-announce-port 6379" >> /tmp/redis.conf
+              echo "cluster-announce-bus-port 16379" >> /tmp/redis.conf
+
+              exec redis-server /tmp/redis.conf
+
+          ports:
+            - containerPort: 6379
+              name: redis
+
+            - containerPort: 16379
+              name: cluster
+
+          readinessProbe:
+            exec:
+              command:
+                - redis-cli
+                - ping
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 3
+
+          volumeMounts:
+            - name: config
+              mountPath: /etc/redis
+
+            - name: data
+              mountPath: /data
+
+      volumes:
+        - name: config
+          configMap:
+            name: redis-config
+
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi

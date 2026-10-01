@@ -1,0 +1,125 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: zookeeper
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true
+  selector:
+    app: zookeeper
+  ports:
+    - name: client
+      port: 2181
+      targetPort: 2181
+    - name: quorum
+      port: 2888
+      targetPort: 2888
+    - name: election
+      port: 3888
+      targetPort: 3888
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: zookeeper
+spec:
+  serviceName: zookeeper
+  podManagementPolicy: Parallel #added because readiness is causing issues with one by one pods creating
+  replicas: 3
+
+  selector:
+    matchLabels:
+      app: zookeeper
+
+  template:
+    metadata:
+      labels:
+        app: zookeeper
+
+    spec:
+      # Run the main ZooKeeper container as the image's
+      # existing zookeeper user (UID/GID 1000).
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+
+      initContainers:
+        - name: set-myid
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              ORDINAL="${HOSTNAME##*-}"
+              MY_ID=$((ORDINAL + 1))
+              echo "$MY_ID" > /data/myid
+              echo "ZooKeeper myid=$MY_ID"
+          volumeMounts:
+            - name: data
+              mountPath: /data
+
+      containers:
+        - name: zookeeper
+          image: zookeeper:3.9
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - echo srvr | nc 127.0.0.1 2181 | grep -q '^Mode:'
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 3
+
+          ports:
+            - name: client
+              containerPort: 2181
+            - name: quorum
+              containerPort: 2888
+            - name: election
+              containerPort: 3888
+
+          env:
+            - name: ZOO_SERVERS
+              value: "server.1=zookeeper-0.zookeeper:2888:3888;2181 server.2=zookeeper-1.zookeeper:2888:3888;2181 server.3=zookeeper-2.zookeeper:2888:3888;2181"
+
+            - name: ZOO_STANDALONE_ENABLED
+              value: "false"
+
+            - name: ZOO_CFG_EXTRA
+              value: "quorumListenOnAllIPs=true"
+
+          volumeMounts:
+            - name: data
+              mountPath: /data
+
+            - name: datalog
+              mountPath: /datalog
+
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+
+    - metadata:
+        name: datalog
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi

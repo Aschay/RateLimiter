@@ -1,0 +1,46 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: redis-cluster-init
+spec:
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: redis-cluster-init
+          image: redis:7.4
+          command:
+            - /bin/sh
+            - -c
+            - |
+              # Wait until all 6 Redis Pods are reachable
+              for i in 0 1 2 3 4 5; do
+                until redis-cli -h redis-$i.redis -p 6379 ping | grep -q PONG; do
+                  echo "Waiting for redis-$i..."
+                  sleep 2
+                done
+              done
+
+              # Check whether a healthy Redis Cluster already exists
+              CLUSTER_STATE=$(redis-cli -h redis-0.redis -p 6379 cluster info 2>/dev/null | grep '^cluster_state:')
+
+              if echo "$CLUSTER_STATE" | grep -q 'cluster_state:ok'; then
+                echo "Redis Cluster already initialized and healthy"
+                exit 0
+              fi
+
+              echo "Redis Cluster not initialized. Creating cluster..."
+
+              # Create 3 masters + 3 replicas
+              redis-cli --cluster create \
+                redis-0.redis:6379 \
+                redis-1.redis:6379 \
+                redis-2.redis:6379 \
+                redis-3.redis:6379 \
+                redis-4.redis:6379 \
+                redis-5.redis:6379 \
+                --cluster-replicas 1 \
+                --cluster-yes
+
+              echo "Redis Cluster created"

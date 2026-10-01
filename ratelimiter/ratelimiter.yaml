@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ratelimiter
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: ratelimiter
+
+  template:
+    metadata:
+      labels:
+        app: ratelimiter
+
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+
+      containers:
+        - name: ratelimiter
+          image: aschay/ratelimiter:latest
+          imagePullPolicy: IfNotPresent
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+
+          ports:
+            - containerPort: 8080
+
+          env:
+            - name: ZOOKEEPER_HOST
+              value: "zookeeper"
+
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ratelimiter
+spec:
+  type: NodePort
+
+  selector:
+    app: ratelimiter
+
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+      nodePort: 30080

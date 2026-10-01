@@ -1,0 +1,45 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: zookeeper-config-__JOB_ID__
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 300
+
+  template:
+    spec:
+      restartPolicy: OnFailure
+
+      containers:
+        - name: config-update
+          image: zookeeper:3.9
+
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -e
+
+              echo "Waiting for ZooKeeper..."
+
+              until zkCli.sh -server zookeeper:2181 <<< "ls /" 2>&1 | grep -q "SyncConnected"; do
+                sleep 2
+              done
+
+              echo "ZooKeeper is ready."
+
+              echo "Updating configuration:"
+              echo "capacity=__CAPACITY__"
+              echo "refillRate=__REFILL_RATE__"
+
+              zkCli.sh -server zookeeper:2181 <<EOF
+              create /rate-limiter ""
+              create /rate-limiter/config ""
+              create /rate-limiter/config/capacity "__CAPACITY__"
+              create /rate-limiter/config/refillRate "__REFILL_RATE__"
+              set /rate-limiter/config/capacity "__CAPACITY__"
+              set /rate-limiter/config/refillRate "__REFILL_RATE__"
+              quit
+              EOF
+
+              echo "Configuration updated successfully."
