@@ -25,9 +25,6 @@ spring:
               filters:
                 - RateLimit
 
-  webflux:
-    multipart:
-      max-in-memory-size:
 
 server:
   port: 8080

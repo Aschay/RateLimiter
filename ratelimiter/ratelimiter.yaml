@@ -20,9 +20,45 @@ spec:
         runAsUser: 1001
         runAsGroup: 1001
 
+      initContainers:
+        - name: wait-for-zookeeper
+          image: zookeeper:3.9
+
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -e
+
+              echo "Waiting for ZooKeeper..."
+
+              until zkCli.sh -server zookeeper:2181 <<< "ls /" 2>&1 | grep -q "SyncConnected"; do
+                sleep 2
+              done
+
+              echo "ZooKeeper is connected."
+
+              echo "Waiting for rate-limit configuration..."
+
+              until zkCli.sh -server zookeeper:2181 <<< "ls /rate-limiter/config" 2>&1 | grep -q "capacity" &&
+                    zkCli.sh -server zookeeper:2181 <<< "ls /rate-limiter/config" 2>&1 | grep -q "refillRate"; do
+                sleep 2
+              done
+
+              echo "ZooKeeper rate-limit configuration is available."
+
       containers:
         - name: ratelimiter
-          image: aschay/ratelimiter:latest
+          image: rate-limiter:42
           imagePullPolicy: IfNotPresent
 
           securityContext:
@@ -38,6 +74,13 @@ spec:
             - name: ZOOKEEPER_HOST
               value: "zookeeper"
 
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8080
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 3
 
 ---
 apiVersion: v1
